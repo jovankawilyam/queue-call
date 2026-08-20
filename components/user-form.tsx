@@ -65,6 +65,9 @@ export default function UserForm() {
   return (
     <div className="w-full">
       <header className="mb-8 text-center">
+        <span className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1e3a5f] text-white shadow-lg shadow-[#1e3a5f]/20">
+          <TicketIcon className="h-8 w-8" />
+        </span>
         <h1 className="text-3xl font-bold tracking-tight text-[#1e3a5f] sm:text-4xl">
           Daftar Antrean
         </h1>

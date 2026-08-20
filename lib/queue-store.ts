@@ -8,7 +8,8 @@ import type {
   UpdateQueueItemInput,
 } from "./types";
 
-const DATA_DIR = join(process.cwd(), ".data");
+const DATA_DIR =
+  process.env.VERCEL === "1" ? "/tmp/queue-call" : join(process.cwd(), ".data");
 const DATA_FILE = join(DATA_DIR, "queue.json");
 
 interface PersistedStore {
