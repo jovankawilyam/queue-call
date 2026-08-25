@@ -1,113 +1,68 @@
 const CHIME_URL = "/audio/chime.mp3";
 
 export function isSpeechSupported(): boolean {
-  return typeof window !== "undefined" && "speechSynthesis" in window;
+  return typeof window !== "undefined";
 }
 
-let cachedVoices: SpeechSynthesisVoice[] | null = null;
-let voicesListenerAttached = false;
-
-function loadVoices(): SpeechSynthesisVoice[] {
-  if (!isSpeechSupported()) {
-    return [];
-  }
-  if (cachedVoices === null) {
-    cachedVoices = window.speechSynthesis.getVoices();
-  }
-  return cachedVoices;
-}
-
-function refreshVoices(): void {
-  if (isSpeechSupported()) {
-    cachedVoices = window.speechSynthesis.getVoices();
-  }
-}
-
-function attachVoicesListener(): void {
-  if (!isSpeechSupported() || voicesListenerAttached) {
-    return;
-  }
-  voicesListenerAttached = true;
-  window.speechSynthesis.onvoiceschanged = () => {
-    refreshVoices();
-  };
-}
-
-function normalizeLang(lang: string): string {
-  return lang.toLowerCase().replace("_", "-");
-}
-
-function isIndonesianVoice(voice: SpeechSynthesisVoice): boolean {
-  return normalizeLang(voice.lang).startsWith("id");
-}
-
-function scoreVoice(voice: SpeechSynthesisVoice): number {
-  const name = voice.name.toLowerCase();
-  let score = 0;
-
-  if (/natural|neural|gadis|online/i.test(name)) score += 3;
-  if (/ardi|damayanti|google|siri|premium|enhanced/i.test(name)) score += 2;
-  if (/microsoft|indonesia|indonesian/i.test(name)) score += 1;
-
-  return score;
-}
-
-function getIndonesianVoice(): SpeechSynthesisVoice | null {
-  const voices = loadVoices();
-  const indonesianVoices = voices.filter(isIndonesianVoice);
-  if (indonesianVoices.length === 0) {
-    return null;
-  }
-
-  let best = indonesianVoices[0];
-  let bestScore = -1;
-  for (const voice of indonesianVoices) {
-    const score = scoreVoice(voice);
-    if (score > bestScore) {
-      bestScore = score;
-      best = voice;
-    }
-  }
-
-  return best;
-}
+let currentAudio: HTMLAudioElement | null = null;
 
 export function cancelSpeech(): void {
-  if (!isSpeechSupported()) {
-    return;
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.src = "";
+    currentAudio = null;
   }
-  window.speechSynthesis.cancel();
+}
+
+async function fetchTtsAudio(text: string): Promise<string> {
+  const res = await fetch("/api/tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`TTS request failed: ${res.status}`);
+  }
+
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 function speakCall(name: string, onEnd?: () => void): void {
-  const utterance = new SpeechSynthesisUtterance(
-    `Panggilan. Atas nama, ${name}, silakan menuju ke meja pelayanan.`,
-  );
-  utterance.lang = "id-ID";
+  const text = `panggilan. Atas nama, ${name}. Silahkan menuju ke meja pelayanan.`;
 
-  const voice = getIndonesianVoice();
-  if (voice) {
-    utterance.voice = voice;
-  }
+  fetchTtsAudio(text)
+    .then((audioUrl) => {
+      const audio = new Audio(audioUrl);
+      currentAudio = audio;
 
-  utterance.rate = 0.80;
-  utterance.pitch = 1;
-  utterance.volume = 1;
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        currentAudio = null;
+        onEnd?.();
+      };
 
-  if (onEnd) {
-    utterance.onend = () => onEnd();
-    utterance.onerror = () => onEnd();
-  }
+      audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
+        currentAudio = null;
+        console.error("Gagal memutar audio TTS");
+        onEnd?.();
+      };
 
-  window.speechSynthesis.speak(utterance);
+      void audio.play();
+    })
+    .catch((err) => {
+      console.error("Gagal mengambil audio TTS:", err);
+      onEnd?.();
+    });
 }
 
 export function playCallAnnouncement(name: string, onEnd?: () => void): boolean {
-  if (!isSpeechSupported()) {
+  if (typeof window === "undefined") {
     return false;
   }
 
-  attachVoicesListener();
   cancelSpeech();
 
   const audio = new Audio(CHIME_URL);

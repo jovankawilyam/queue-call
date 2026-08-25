@@ -485,15 +485,7 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {!speechSupported && (
-        <p
-          className="mt-4 rounded-xl border border-[#efd9a7] bg-[#fdf4e0] px-5 py-3 text-[14px] text-[#8a6410]"
-          role="status"
-        >
-          Browser ini tidak mendukung fitur suara (Web Speech API). Pemanggilan
-          lewat audio dilewati.
-        </p>
-      )}
+
 
       {error && (
         <p
